@@ -1,9 +1,10 @@
 use std::fs::File;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct Config {
-    pub username: String
+    pub username: String,
+    pub user_color: [u8; 3]
 }
 
 impl Config {

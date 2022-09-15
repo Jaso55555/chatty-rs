@@ -1,4 +1,4 @@
-pub struct ServerDiscovery {
-    name: String,
-    channels: Vec<String>
-}
+// pub struct ServerDiscovery {
+//     name: String,
+//     channels: Vec<String>
+// }

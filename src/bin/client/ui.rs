@@ -1,3 +1,5 @@
+mod message;
+
 use std::io;
 use std::io::Stdout;
 
@@ -10,8 +12,15 @@ use crossterm::{
 use tui::{backend::CrosstermBackend, Frame, Terminal};
 use tui::backend::Backend;
 use tui::layout::{Constraint, Direction, Layout};
-use tui::widgets::{Block, Borders, List};
-use common::message::{collect_messages, Message};
+use tui::style::Style;
+use tui::widgets::{Block, Borders};
+use tui_textarea::TextArea;
+
+
+use common::message::Message;
+use crate::ui::message::draw_messages;
+
+
 
 pub fn init() -> Terminal<CrosstermBackend<Stdout>> {
     let mut stdout = io::stdout();
@@ -34,47 +43,53 @@ pub fn close(mut term: Terminal<CrosstermBackend<Stdout>>) {
     term.show_cursor().unwrap();
 }
 
-// Draw code here
-pub fn draw<B: Backend>(f: &mut Frame<B>, message_list: Vec<Message>) {
 
-    let whole = Layout::default()
-        .direction(Direction::Horizontal)
-        .margin(1)
-        .constraints(
-            [
-                Constraint::Percentage(20),
-                Constraint::Percentage(80),
-            ].as_ref()
-        )
-        .split(f.size());
-
-    let chat = Layout::default()
-        .direction(Direction::Vertical)
-        .margin(0)
-        .constraints(
-            [
-                Constraint::Min(5),
-                Constraint::Length(2),
-            ].as_ref()
-        )
-        .split(whole[1]);
-
-    let channels = Block::default()
-        .title(" Channels ")
-        .borders(Borders::ALL);
-    f.render_widget(channels, whole[0]);
-
-    let messages = List::new(collect_messages(&message_list))
-        .block(
-            Block::default()
-                .title("Messages")
-                .borders(Borders::BOTTOM)
-        );
-
-    f.render_widget(messages, chat[0]);
-
-
-    let _input_area = Block::default().inner(chat[1]);
+pub struct UIStorage<'a> {
+    pub text_area: TextArea<'a>,
 }
 
+impl<'a> UIStorage<'a> {
+    pub fn new() -> Self {
+        let mut text_area = TextArea::default();
+        text_area.set_cursor_line_style(Style::default());
 
+        Self {
+            text_area
+        }
+    }
+
+    pub fn draw<B: Backend>(&mut self, f: &mut Frame<B>, message_list: &Vec<Message>, scroll: u16) {
+        let whole = Layout::default()
+            .direction(Direction::Horizontal)
+            .margin(1)
+            .constraints(
+                [
+                    Constraint::Percentage(20),
+                    Constraint::Percentage(80),
+                ].as_ref()
+            )
+            .split(f.size());
+
+        let chat = Layout::default()
+            .direction(Direction::Vertical)
+            .margin(0)
+            .constraints(
+                [
+                    Constraint::Min(5),
+                    Constraint::Length(2),
+                ].as_ref()
+            )
+            .split(whole[1]);
+
+        let channels = Block::default()
+            .title(" Channels ")
+            .borders(Borders::ALL);
+        f.render_widget(channels, whole[0]);
+
+
+
+        draw_messages(f, message_list, chat[0], scroll);
+
+        f.render_widget(self.text_area.widget(), chat[1]);
+    }
+}

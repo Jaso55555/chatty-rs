@@ -1,15 +1,17 @@
 use std::fmt::{Display, Formatter};
 use std::io::Read;
+use chrono::{DateTime, Utc};
 use serde::{
     Deserialize,
     Serialize
 };
-use tui::widgets::ListItem;
 
 #[derive(Serialize, Deserialize)]
 pub struct Message {
     pub sender: String,
-    pub content: String
+    pub content: String,
+    pub timestamp: DateTime<Utc>,
+    pub color: [u8; 3]
 }
 
 impl Message {
@@ -25,8 +27,4 @@ impl Display for Message {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} -> {}", self.sender, self.content)
     }
-}
-
-pub fn collect_messages(list: &Vec<Message>) -> Vec<ListItem> {
-    list.iter().map(|item| ListItem::new(format!("{}", item))).collect()
 }
