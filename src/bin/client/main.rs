@@ -1,4 +1,3 @@
-mod config;
 mod ui;
 mod net;
 
@@ -7,11 +6,12 @@ use chrono::Utc;
 use tui_textarea::{CursorMove, Input, Key};
 
 use common::message::Message;
-use crate::net::NetCode;
-use crate::ui::UIStorage;
+use common::user_config::UserConfig;
+use net::NetCode;
+use ui::UIStorage;
 
 fn main() -> Result<(), io::Error> {
-    let config = config::Config::load();
+    let config = UserConfig::load();
 
     let mut term = ui::init();
     let mut ui = UIStorage::new();
