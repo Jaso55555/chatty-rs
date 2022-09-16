@@ -5,6 +5,7 @@ pub enum NetCodeErr {
     CouldNotConnect,
     MessageSendFailed,
     CouldNotSetNonBlocking,
+    BadPacket,
     UnknownError
 }
 
@@ -17,6 +18,8 @@ impl NetCodeErr {
                 NetCodeErr::CouldNotConnect => "Could not connect to server",
                 NetCodeErr::MessageSendFailed => "Could not send message",
                 NetCodeErr::CouldNotSetNonBlocking => "Could not set socket to non-blocking mode",
+                NetCodeErr::BadPacket => "Bad packet received, closing connection",
+
                 _ => "Unknown error"
             }
         )

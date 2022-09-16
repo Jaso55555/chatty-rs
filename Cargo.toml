@@ -13,7 +13,8 @@ tui = "0.19.0"
 tui-textarea = { git = "https://github.com/rhysd/tui-textarea" }
 crossterm = "0.25.0"
 chrono = { version = "0.4.22", features = ["serde"] }
-
+simplelog = "0.12.0"
+log = "0.4.17"
 
 [[bin]]
 name = "server"

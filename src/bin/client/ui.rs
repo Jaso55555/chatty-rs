@@ -1,5 +1,6 @@
 mod message;
 
+use std::fmt::Display;
 use std::io;
 use std::io::Stdout;
 
@@ -8,6 +9,7 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
+use log::info;
 
 use tui::{backend::CrosstermBackend, Frame, Terminal};
 use tui::backend::Backend;
@@ -92,4 +94,13 @@ impl<'a> UIStorage<'a> {
 
         f.render_widget(self.text_area.widget(), chat[1]);
     }
+}
+
+pub fn crash<T: Display>(term: Option<Terminal<CrosstermBackend<Stdout>>>, error: T) {
+    match term {
+        // If ui is active, shut it down
+        Some(term) => close(term),
+        _ => {}
+    }
+    info!("{error}")
 }

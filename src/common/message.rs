@@ -21,6 +21,15 @@ impl Message {
             Err(_) => None
         }
     }
+
+    pub fn new_client_message<T: ToString>(content: T) -> Self {
+        Self {
+            sender: "[CLIENT]".to_string(),
+            content: content.to_string(),
+            timestamp: Utc::now(),
+            color: [255, 247, 0]
+        }
+    }
 }
 
 impl Display for Message {

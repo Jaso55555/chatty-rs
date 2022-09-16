@@ -1,45 +1,85 @@
-use std::io::Write;
-use std::net::{TcpListener, TcpStream};
+use std::fs::File;
+use std::net::TcpListener;
+use std::sync::mpsc::channel;
 use std::thread::spawn;
+
 use chrono::Utc;
 
-use serde::Serialize;
-use rmp_serde::Serializer;
-
-use common::message::Message;
+use log::info;
 
 pub mod user;
-
+use user::User;
 
 fn main() {
-    println!("Running server!");
+    simplelog::CombinedLogger::init(vec![
+        simplelog::TermLogger::new(
+            simplelog::LevelFilter::Info,
+            simplelog::Config::default(),
+            simplelog::TerminalMode::Mixed,
+            simplelog::ColorChoice::Auto
+        ),
+        simplelog::WriteLogger::new(
+            simplelog::LevelFilter::Info,
+            simplelog::Config::default(),
+            File::create(
+                format!("logs\\server-{}.txt", Utc::now().format("%d-%m-%Y-%H-%M"))
+            ).expect("Could not create log")
+        )
+    ]).expect("Could not init logger");
+
+    info!("Running server!");
 
     let listener = TcpListener::bind("127.0.0.1:5678").expect("Could not bind to IP");
-    let mut users: Vec<TcpStream> = Vec::new();
+    let (to_setup_tx, to_setup_rx) = channel::<User>();
+    let (to_active_tx, to_active_rx) = channel::<User>();
 
     let _listener_thread = spawn(move || {
         for incoming in listener.incoming() {
             match incoming {
-                Ok(mut stream) => {
-
-                    let msg = Message {
-                        sender: "%SRV%".to_string(),
-                        content: "Connected!".to_string(),
-                        timestamp: Utc::now(),
-                        color: [255, 247, 0]
+                Ok(socket) => {
+                    let user = match User::new(socket) {
+                        Err(error) => {
+                            info!("{}", error);
+                            continue
+                        }
+                        Ok(user) => user
                     };
-                    let mut buf = Vec::new();
 
-                    msg.serialize( &mut Serializer::new(&mut buf) ).expect("Could not serialize message");
-
-                    stream.write_all(
-                        buf.as_slice()
-                    ).expect("Could not send message");
-
-                    users.push(stream)
+                    to_setup_tx.send(user).expect("Could not send user")
                 }
                 Err(_) => {}
             }
+        }
+    });
+
+    let _setup_thread = spawn(move || {
+        let mut users: Vec<User> = Vec::new();
+        loop {
+            users.append(&mut to_setup_rx.try_iter().collect());
+
+            let mut i = 0;
+            while i < users.len() {
+                match users[i].setup_behave() {
+                    Some(Ok(_)) => {
+                        to_active_tx.send(users.remove(i)).expect("Could not send user")
+                    }
+                    Some(Err(error)) => {
+                        info!("{error}");
+                        users.remove(i).close()
+                    }
+                    None => {
+                        i += 1;
+                    }
+                }
+            }
+        }
+    });
+
+    let _active_thread = spawn(move || {
+        let mut users: Vec<User> = Vec::new();
+        loop {
+            users.append(&mut to_active_rx.try_iter().collect());
+
         }
     });
 

@@ -1,3 +1,5 @@
 pub mod message;
-pub mod discovery;
-pub mod user_config;
+pub mod client_config;
+pub mod net;
+pub mod channel;
+pub mod utils;
