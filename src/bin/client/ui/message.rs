@@ -7,13 +7,13 @@ use common::message::Message;
 use tui::text::{Span, Spans};
 use tui::style::{Color, Modifier, Style};
 
-pub fn draw_messages<B: Backend>(f: &mut Frame<B>, message_list: &Vec<Message>, rect: Rect, scroll: u16) {
-    let paragraph  = collect_messages(message_list, scroll);
+pub fn draw_messages<B: Backend>(f: &mut Frame<B>, message_list: &Vec<Message>, rect: Rect, scroll: u16, state: bool) {
+    let paragraph  = collect_messages(message_list, scroll, state);
 
     f.render_widget(paragraph, rect);
 }
 
-pub fn collect_messages<'a>(list: &Vec<Message>, scroll: u16) -> Paragraph<'a> {
+pub fn collect_messages<'a>(list: &Vec<Message>, scroll: u16, state: bool) -> Paragraph<'a> {
     let mut lines = Vec::new();
 
     for item in list.iter() {
@@ -37,6 +37,11 @@ pub fn collect_messages<'a>(list: &Vec<Message>, scroll: u16) -> Paragraph<'a> {
         ));
     }
 
+    let state_color = match state {
+        true => Color::White,
+        false => Color::LightYellow
+    };
+
     Paragraph::new(lines)
         .wrap(Wrap {
             trim: true
@@ -45,5 +50,9 @@ pub fn collect_messages<'a>(list: &Vec<Message>, scroll: u16) -> Paragraph<'a> {
         .block(
             Block::default()
                 .borders(Borders::BOTTOM)
+                .border_style(
+                    Style::default()
+                        .fg(state_color)
+                )
         )
 }

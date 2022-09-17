@@ -6,7 +6,7 @@ use serde::{
     Serialize
 };
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Message {
     pub sender: String,
     pub content: String,
@@ -22,7 +22,7 @@ impl Message {
         }
     }
 
-    pub fn new_client_message<T: ToString>(content: T) -> Self {
+    pub fn new_system_message<T: ToString>(content: T) -> Self {
         Self {
             sender: "[CLIENT]".to_string(),
             content: content.to_string(),

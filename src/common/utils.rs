@@ -28,13 +28,9 @@ pub fn write_obj_to_socket<I: Serialize>(socket: &mut TcpStream, obj: I) -> io::
     )
 }
 
-// pub fn read_from_socket<O: DeserializeOwned>(socket: &mut TcpStream) -> Option<Result<O, DeError>> {
-//     let mut buf = Vec::new();
-//
-//     match socket.read_to_end(&mut buf) {
-//         Err(_) => return None,
-//         _ => {}
-//     };
-//
-//     Some(deserialize_rmp::<O>(buf))
-// }
+pub fn await_object<T: DeserializeOwned>(socket: &mut TcpStream) -> Option<T> {
+    match rmp_serde::from_read::<&mut TcpStream, T>(socket) {
+        Ok(obj) => Some(obj),
+        Err(_) => None
+    }
+}

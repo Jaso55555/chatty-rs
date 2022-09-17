@@ -1,3 +1,4 @@
+use std::io;
 use std::io::Write;
 use std::net::{Shutdown, TcpStream};
 use log::{error, info, warn};
@@ -6,8 +7,9 @@ use serde::de::DeserializeOwned;
 use common::net::error::NetCodeErr;
 use common::net::init::{ConnectionInit, FinalHandshake};
 use common::client_config::ClientConfig;
-use common::message::Message;
-use common::utils::{serialize_rmp, write_obj_to_socket};
+use common::net::active::ActivePacket;
+use common::utils::{await_object, serialize_rmp, write_obj_to_socket};
+use crate::user::UserState::{Closed, Closing};
 
 pub struct User {
     socket: TcpStream,
@@ -77,44 +79,73 @@ impl User {
                     }
                 }
             }
-            UserState::Active => {
+            UserState::Active | Closing { .. } | Closed => {
                 unreachable!()
             }
         }
     }
 
-    pub fn behave(&mut self) -> Option<Result<(), NetCodeErr>> {
-        None
+    pub fn behave(&mut self) -> Option<Result<ActivePacket, NetCodeErr>> {
+        match await_object::<ActivePacket>(&mut self.socket) {
+            Some(msg) => Some(Ok(msg)),
+            None => None,
+        }
     }
 
-    pub fn send_message(&mut self, _messages: &Vec<Message>) {
-        todo!()
+    pub fn send_packets(&mut self, packets: &Vec<ActivePacket>) -> Vec<(io::Error, ActivePacket)> {
+        let mut errors = Vec::new();
+
+        for item in packets.iter() {
+            match write_obj_to_socket(&mut self.socket, item) {
+                Ok(_) => {},
+                Err(error) => {
+                    errors.push((error, (*item).clone()))
+                }
+            }
+        }
+
+        errors
     }
 
     fn await_object<T: DeserializeOwned>(&mut self) -> Result<T, Error> {
         rmp_serde::from_read::<&mut TcpStream, T>(&mut self.socket)
     }
 
-    pub fn close(self) {
-        todo!()
+    pub fn close<T: ToString>(mut self, reason: T) {
+        self.state = Closing { reason: reason.to_string() }
     }
+}
 
-    // fn try_recv_config(&mut self) -> Option<Result<(), NetCodeErr>> {
-    //     let mut buf = Vec::new();
-    //
-    //     self.socket.read_to_end(&mut buf).ok()?;
-    //
-    //     match deserialize_rmp::<ClientConfig>(buf) {
-    //         Ok(config) => self.config = Some(config),
-    //         Err(_) => return Some(Err(NetCodeErr::BadPacket))
-    //     }
-    //
-    //     return None
-    // }
+impl Drop for User {
+    fn drop(&mut self) {
+        if let Err(e) = self.socket.set_nonblocking(false) {
+            warn!("Could not set blocking mode on closing connection: {}", e)
+        };
+        match &self.state {
+            UserState::WaitingForConfig | Closed => {}
+            UserState::Active => {
+                self.send_packets(&vec![
+                    ActivePacket::Shutdown {
+                        reason: "Server closed connection unexpectedly".to_string()
+                    }
+                ]);
+            }
+            Closing { reason } => {
+                ActivePacket::Shutdown {
+                    reason: reason.clone()
+                };
+                if let Err(e) = self.socket.shutdown(Shutdown::Both) {
+                    error!("Could not shutdown socket: {}", e)
+                }
+            }
+        }
+    }
 }
 
 enum UserState {
     // Unauthenticated, TODO
     WaitingForConfig,
-    Active
+    Active,
+    Closing { reason: String },
+    Closed
 }

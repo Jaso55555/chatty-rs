@@ -2,18 +2,20 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use crate::config::{load_config, write_config};
 
-const CLIENT_CONFIG_PATH: &'static str = "client_config.json";
+const SERVER_CONFIG_PATH: &'static str = "server_config.json";
 
 #[derive(Deserialize, Serialize)]
-pub struct ClientConfig {
-    pub username: String,
-    pub user_color: [u8; 3]
+pub struct ServerConfig {
+    pub name: String,
+    pub motd: String,
+    pub color: [u8; 3],
+    pub tickrate: u32
 }
 
-impl ClientConfig {
+impl ServerConfig {
     /// Output.1: Was new config created
     pub fn load() -> (Self, bool) {
-        match load_config(PathBuf::from(CLIENT_CONFIG_PATH)) {
+        match load_config(PathBuf::from(SERVER_CONFIG_PATH)) {
             Ok(config) => (config, false),
             Err(_error) => {
                 let mut config = Self::default();
@@ -27,15 +29,17 @@ impl ClientConfig {
     }
 
     pub fn write(&mut self) {
-        write_config(PathBuf::from(CLIENT_CONFIG_PATH), self)
+        write_config(PathBuf::from(SERVER_CONFIG_PATH), self)
     }
 }
 
-impl Default for ClientConfig {
+impl Default for ServerConfig {
     fn default() -> Self {
         Self {
-            username: "Default Username".to_string(),
-            user_color: [255,255,255]
+            name: "Default Server Name".to_string(),
+            motd: "Default MOTD".to_string(),
+            color: [255, 247, 0],
+            tickrate: 50
         }
     }
 }

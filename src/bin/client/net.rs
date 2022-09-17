@@ -12,13 +12,14 @@ use std::io::Write;
 use std::net::TcpStream;
 use rmp_serde::Serializer;
 use serde::Serialize;
-use serde::de::DeserializeOwned;
 
 use common::message::Message;
 use common::net::error::NetCodeErr;
 use common::net::init::{ConnectionInit, FinalHandshake};
 use common::client_config::ClientConfig;
-use common::utils::write_obj_to_socket;
+use common::net::active::ActivePacket;
+use common::net::active::ActivePacket::SystemMessage;
+use common::utils::{await_object, write_obj_to_socket};
 
 #[derive(PartialEq)]
 pub enum NetCodeState {
@@ -31,6 +32,15 @@ pub enum NetCodeState {
 pub struct NetCode {
     socket: TcpStream,
     state: NetCodeState
+}
+
+impl Into<bool> for &NetCodeState {
+    fn into(self) -> bool {
+        match self {
+            NetCodeState::Active => true,
+            _ => false
+        }
+    }
 }
 
 impl NetCode {
@@ -49,22 +59,22 @@ impl NetCode {
         })
     }
 
-    pub fn behave(&mut self, config: &ClientConfig) -> Option<Result<Message, NetCodeErr>> {
+    pub fn behave(&mut self, config: &ClientConfig) -> Option<Result<ActivePacket, NetCodeErr>> {
         match self.state {
             NetCodeState::WaitingForInitConfirm => {
                 self.await_init_confirm(config)
             }
             NetCodeState::WaitingForFinalHandshake => {
-                match self.await_object::<FinalHandshake>() {
+                match await_object::<FinalHandshake>(&mut self.socket) {
                     Some(FinalHandshake::Complete) => {
                         self.state = NetCodeState::Active;
-                        Some(Ok(Message::new_client_message("Finished Handshake")))
+                        Some(Ok(SystemMessage(Message::new_system_message("Finished Handshake"))))
                     }
                     None => None
                 }
             }
             NetCodeState::Active => {
-                match self.check_for_messages() {
+                match self.check_for_packets() {
                     Some(msg) => Some(Ok(msg)),
                     None => None
                 }
@@ -72,8 +82,8 @@ impl NetCode {
         }
     }
 
-    fn await_init_confirm(&mut self, config: &ClientConfig) -> Option<Result<Message, NetCodeErr>> {
-        match self.await_object::<ConnectionInit>() {
+    fn await_init_confirm(&mut self, config: &ClientConfig) -> Option<Result<ActivePacket, NetCodeErr>> {
+        match await_object::<ConnectionInit>(&mut self.socket) {
             Some(_msg) => {
 
                 match write_obj_to_socket(&mut self.socket, config) {
@@ -82,31 +92,21 @@ impl NetCode {
                     }
                     Err(_) => return Some(Err(NetCodeErr::UnknownError))
                 }
-                Some(Ok(Message::new_client_message("Sending Config")))
+                Some(Ok(SystemMessage(Message::new_system_message("Sending Config"))))
             }
             None => None
         }
     }
 
-    fn await_object<T: DeserializeOwned>(&mut self) -> Option<T> {
-        match rmp_serde::from_read::<&mut TcpStream, T>(&mut self.socket) {
-            Ok(obj) => Some(obj),
-            Err(_) => None
-        }
-    }
-
-    fn check_for_messages(&mut self) -> Option<Message> {
-        match Message::try_read(&mut self.socket) {
-            None => None,
-            Some(msg) => Some(msg)
-        }
+    fn check_for_packets(&mut self) -> Option<ActivePacket> {
+        await_object::<ActivePacket>(&mut self.socket)
     }
 
     pub fn check_state(&self) -> &NetCodeState {
         &self.state
     }
 
-    pub fn send_message(&mut self, msg: &Message) -> Result<(), NetCodeErr> {
+    pub fn send_packet(&mut self, msg: &ActivePacket) -> Result<(), NetCodeErr> {
         let mut buf = Vec::new();
 
         msg.serialize( &mut Serializer::new(&mut buf) ).expect("Could not serialize message");

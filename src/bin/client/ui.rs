@@ -1,4 +1,5 @@
 mod message;
+pub mod choice;
 
 use std::fmt::Display;
 use std::io;
@@ -18,8 +19,8 @@ use tui::style::Style;
 use tui::widgets::{Block, Borders};
 use tui_textarea::TextArea;
 
-
 use common::message::Message;
+use crate::Choice;
 use crate::ui::message::draw_messages;
 
 
@@ -48,6 +49,7 @@ pub fn close(mut term: Terminal<CrosstermBackend<Stdout>>) {
 
 pub struct UIStorage<'a> {
     pub text_area: TextArea<'a>,
+    pub choice: Option<Choice<'a>>,
 }
 
 impl<'a> UIStorage<'a> {
@@ -56,11 +58,12 @@ impl<'a> UIStorage<'a> {
         text_area.set_cursor_line_style(Style::default());
 
         Self {
-            text_area
+            text_area,
+            choice: None
         }
     }
 
-    pub fn draw<B: Backend>(&mut self, f: &mut Frame<B>, message_list: &Vec<Message>, scroll: u16) {
+    pub fn draw<B: Backend>(&mut self, f: &mut Frame<'a, B>, message_list: &Vec<Message>, scroll: u16, state: bool) {
         let whole = Layout::default()
             .direction(Direction::Horizontal)
             .margin(1)
@@ -88,9 +91,17 @@ impl<'a> UIStorage<'a> {
             .borders(Borders::ALL);
         f.render_widget(channels, whole[0]);
 
+        if let Some(choice) = &mut self.choice {
+            if choice.focused() {
+                choice.draw(
+                    f,
+                    chat[0]
+                )
+            }
+        } else {
+            draw_messages(f, message_list, chat[0], scroll, state);
+        }
 
-
-        draw_messages(f, message_list, chat[0], scroll);
 
         f.render_widget(self.text_area.widget(), chat[1]);
     }

@@ -13,6 +13,9 @@ use ui::UIStorage;
 use crate::net::NetCodeState;
 use crate::ui::{close, crash};
 use simplelog;
+use tui::text::{Span, Spans};
+use common::net::active::ActivePacket;
+use crate::ui::choice::Choice;
 
 
 fn main() -> Result<(), io::Error> {
@@ -23,12 +26,15 @@ fn main() -> Result<(), io::Error> {
             format!("logs\\client-{}.txt", Utc::now().format("%d-%m-%Y-%H-%M"))
         ).expect("Could not create log")
     ).expect("Could not init logger");
-    let config = ClientConfig::load();
+
+    let mut term = ui::init();
+
+    let (config, _new_config) = ClientConfig::load();
 
     let mut net = match NetCode::init(&config) {
         Ok(net) => net,
         Err(e) => {
-            crash(None, e);
+            crash(Some(term), e);
             return Ok(())
         }
     };
@@ -42,13 +48,29 @@ fn main() -> Result<(), io::Error> {
         }
     ];
 
-    let mut term = ui::init();
     let mut ui = UIStorage::new();
+    ui.choice = Some(Choice::new(
+        "Hey, just wondering if you got your photos printed?",
+        vec![
+            "Wha..?".to_string(),
+            "Bogos binted.".to_string(),
+            "This joke isn't funny".to_string()
+        ]
+    ));
     let mut scroll = 0;
 
     loop {
         match net.behave(&config) {
-            Some(Ok(msg)) => message_list.push(msg),
+            Some(Ok(msg)) => {
+                match msg {
+                    ActivePacket::Message(msg)
+                    | ActivePacket::SystemMessage(msg) => message_list.push(msg),
+                    ActivePacket::Shutdown { reason } => {
+                        crash(Some(term), reason);
+                        return Ok(())
+                    }
+                }
+            },
             Some(Err(e)) => {
                 crash(Some(term), e);
                 return Ok(())
@@ -57,11 +79,13 @@ fn main() -> Result<(), io::Error> {
         }
 
         term.draw(|f| {
-            ui.draw(f, &message_list, scroll)
+            ui.draw(f, &message_list, scroll, net.check_state().into())
         })?;
 
         match crossterm::event::read()?.into() {
             Input { key: Key::Esc, .. } => {
+                ui.choice.unwrap().toggle_focus();
+
                 break
             }
             Input { key: Key::Enter, .. } => {
@@ -76,9 +100,9 @@ fn main() -> Result<(), io::Error> {
                             color: config.user_color
                         };
 
-                        net.send_message(&msg).expect("Could not send message");
-                        message_list.push(msg);
+                        let packet = ActivePacket::Message(msg);
 
+                        net.send_packet(&packet).expect("Could not send message");
 
                         ui.text_area.move_cursor(CursorMove::Head);
                         ui.text_area.delete_line_by_end();
@@ -95,15 +119,12 @@ fn main() -> Result<(), io::Error> {
                     scroll += 1
                 }
             }
-
             input => {
                 if ui.text_area.input(input) {
                     // If textbox is changed, do stuff here
                 }
             }
         }
-
-
     }
 
     close(term);
