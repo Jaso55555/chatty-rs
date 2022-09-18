@@ -7,7 +7,8 @@ const CLIENT_CONFIG_PATH: &'static str = "client_config.json";
 #[derive(Deserialize, Serialize)]
 pub struct ClientConfig {
     pub username: String,
-    pub user_color: [u8; 3]
+    pub user_color: [u8; 3],
+    pub ip: String
 }
 
 impl ClientConfig {
@@ -35,7 +36,8 @@ impl Default for ClientConfig {
     fn default() -> Self {
         Self {
             username: "Default Username".to_string(),
-            user_color: [255,255,255]
+            user_color: [255,255,255],
+            ip: "127.0.0.1:5678".to_string()
         }
     }
 }

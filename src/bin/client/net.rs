@@ -44,8 +44,8 @@ impl Into<bool> for &NetCodeState {
 }
 
 impl NetCode {
-    pub fn init(_config: &ClientConfig) -> Result<Self, NetCodeErr> {
-        let socket = match TcpStream::connect("127.0.0.1:5678") {
+    pub fn init(config: &ClientConfig) -> Result<Self, NetCodeErr> {
+        let socket = match TcpStream::connect(config.ip.clone()) {
             Ok(socket) => socket,
             Err(_error) => return Err(NetCodeErr::CouldNotConnect)
         };
