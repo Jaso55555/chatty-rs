@@ -6,5 +6,7 @@
   "color": [255, 247, 0],
 
   "_tickrate": "How many ms to wait between ticks",
-  "tickrate": 50
+  "tickrate": 50,
+
+  "ip": "127.0.0.1:5678"
 }

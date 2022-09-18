@@ -9,7 +9,8 @@ pub struct ServerConfig {
     pub name: String,
     pub motd: String,
     pub color: [u8; 3],
-    pub tickrate: u64
+    pub tickrate: u64,
+    pub ip: String
 }
 
 impl ServerConfig {
@@ -39,7 +40,8 @@ impl Default for ServerConfig {
             name: "Default Server Name".to_string(),
             motd: "Default MOTD".to_string(),
             color: [255, 247, 0],
-            tickrate: 50
+            tickrate: 50,
+            ip: "127.0.0.1:5678".to_string()
         }
     }
 }

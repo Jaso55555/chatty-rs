@@ -39,7 +39,7 @@ fn main() {
 
     info!("Config loaded, was new config created: {}", new_config);
 
-    let listener = TcpListener::bind("127.0.0.1:5678").expect("Could not bind to IP");
+    let listener = TcpListener::bind(config.ip.clone()).expect("Could not bind to IP");
     let (to_setup_tx, to_setup_rx) = channel::<User>();
     let (to_active_tx, to_active_rx) = channel::<User>();
 
