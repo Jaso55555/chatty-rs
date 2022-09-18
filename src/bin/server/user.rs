@@ -114,6 +114,14 @@ impl User {
     pub fn close<T: ToString>(mut self, reason: T) {
         self.state = Closing { reason: reason.to_string() }
     }
+
+    pub fn config(&self) -> Option<&ClientConfig> {
+        self.config.as_ref()
+    }
+
+    pub fn mut_config(&mut self) -> Option<&mut ClientConfig> {
+        self.config.as_mut()
+    }
 }
 
 impl Drop for User {
@@ -131,9 +139,10 @@ impl Drop for User {
                 ]);
             }
             Closing { reason } => {
+                self.send_packets(&vec![
                 ActivePacket::Shutdown {
                     reason: reason.clone()
-                };
+                }]);
                 if let Err(e) = self.socket.shutdown(Shutdown::Both) {
                     error!("Could not shutdown socket: {}", e)
                 }

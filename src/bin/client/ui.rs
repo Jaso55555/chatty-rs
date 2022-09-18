@@ -10,7 +10,6 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use log::info;
 
 use tui::{backend::CrosstermBackend, Frame, Terminal};
 use tui::backend::Backend;
@@ -49,7 +48,7 @@ pub fn close(mut term: Terminal<CrosstermBackend<Stdout>>) {
 
 pub struct UIStorage<'a> {
     pub text_area: TextArea<'a>,
-    pub choice: Option<Choice<'a>>,
+    pub choice: Choice<'a>,
 }
 
 impl<'a> UIStorage<'a> {
@@ -57,13 +56,22 @@ impl<'a> UIStorage<'a> {
         let mut text_area = TextArea::default();
         text_area.set_cursor_line_style(Style::default());
 
+        let choice = Choice::new(
+            "Hey, just wondering if you got your photos printed?",
+            vec![
+                "Wha..?".to_string(),
+                "Bogos binted.".to_string(),
+                "This joke isn't funny".to_string()
+            ]
+        );
+
         Self {
             text_area,
-            choice: None
+            choice
         }
     }
 
-    pub fn draw<B: Backend>(&mut self, f: &mut Frame<'a, B>, message_list: &Vec<Message>, scroll: u16, state: bool) {
+    pub fn draw<B: Backend>(&mut self, f: &mut Frame<B>, message_list: &Vec<Message>, scroll: u16, state: bool) {
         let whole = Layout::default()
             .direction(Direction::Horizontal)
             .margin(1)
@@ -91,13 +99,11 @@ impl<'a> UIStorage<'a> {
             .borders(Borders::ALL);
         f.render_widget(channels, whole[0]);
 
-        if let Some(choice) = &mut self.choice {
-            if choice.focused() {
-                choice.draw(
-                    f,
-                    chat[0]
-                )
-            }
+        if self.choice.focused() {
+            self.choice.draw(
+                f,
+                chat[0]
+            )
         } else {
             draw_messages(f, message_list, chat[0], scroll, state);
         }
@@ -108,10 +114,6 @@ impl<'a> UIStorage<'a> {
 }
 
 pub fn crash<T: Display>(term: Option<Terminal<CrosstermBackend<Stdout>>>, error: T) {
-    match term {
-        // If ui is active, shut it down
-        Some(term) => close(term),
-        _ => {}
-    }
-    info!("{error}")
+    if let Some(term) = term { close(term) }
+    println!("{error}")
 }

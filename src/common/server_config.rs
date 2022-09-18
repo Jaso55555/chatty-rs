@@ -4,12 +4,12 @@ use crate::config::{load_config, write_config};
 
 const SERVER_CONFIG_PATH: &'static str = "server_config.json";
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct ServerConfig {
     pub name: String,
     pub motd: String,
     pub color: [u8; 3],
-    pub tickrate: u32
+    pub tickrate: u64
 }
 
 impl ServerConfig {

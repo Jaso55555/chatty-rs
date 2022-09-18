@@ -116,4 +116,15 @@ impl NetCode {
             Err(_error) => Err(NetCodeErr::MessageSendFailed)
         }
     }
+
+    pub fn shutdown<T: ToString>(&mut self, reason: T) -> Result<String, NetCodeErr> {
+        self.socket.set_nonblocking(false).expect("Could not set socket to blocking");
+        self.send_packet(&ActivePacket::Shutdown {
+            reason: reason.to_string()
+        })?;
+        match await_object::<ActivePacket>(&mut self.socket) {
+            Some(ActivePacket::Shutdown {reason}) => Ok(reason),
+            _ => Err(NetCodeErr::UnknownError)
+        }
+    }
 }

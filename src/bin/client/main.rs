@@ -11,9 +11,8 @@ use common::client_config::ClientConfig;
 use net::NetCode;
 use ui::UIStorage;
 use crate::net::NetCodeState;
-use crate::ui::{close, crash};
+use crate::ui::crash;
 use simplelog;
-use tui::text::{Span, Spans};
 use common::net::active::ActivePacket;
 use crate::ui::choice::Choice;
 
@@ -49,14 +48,6 @@ fn main() -> Result<(), io::Error> {
     ];
 
     let mut ui = UIStorage::new();
-    ui.choice = Some(Choice::new(
-        "Hey, just wondering if you got your photos printed?",
-        vec![
-            "Wha..?".to_string(),
-            "Bogos binted.".to_string(),
-            "This joke isn't funny".to_string()
-        ]
-    ));
     let mut scroll = 0;
 
     loop {
@@ -84,9 +75,15 @@ fn main() -> Result<(), io::Error> {
 
         match crossterm::event::read()?.into() {
             Input { key: Key::Esc, .. } => {
-                ui.choice.unwrap().toggle_focus();
+                crash(Some(term), match net.shutdown("User disconnect") {
+                    Ok(v) => v,
+                    Err(e) => e.to_string()
+                });
 
                 break
+            }
+            Input { key: Key::Tab , ..} => {
+                ui.choice.toggle_focus();
             }
             Input { key: Key::Enter, .. } => {
                 // Make sure we're connected first
@@ -126,8 +123,12 @@ fn main() -> Result<(), io::Error> {
             }
         }
     }
-
-    close(term);
+    //
+    // close(term);
 
     Ok(())
 }
+//
+// pub fn draw<B: Backend>(f: &mut Frame<B>, message_list: &Vec<Message>, scroll: u16, state: bool) {
+//     f.render_widget(T, f.size())
+// }

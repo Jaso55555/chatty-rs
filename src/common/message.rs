@@ -5,6 +5,7 @@ use serde::{
     Deserialize,
     Serialize
 };
+use crate::server_config::ServerConfig;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Message {
@@ -28,6 +29,15 @@ impl Message {
             content: content.to_string(),
             timestamp: Utc::now(),
             color: [255, 247, 0]
+        }
+    }
+
+    pub fn new_server_message<T: ToString>(content: T, config: &ServerConfig) -> Self {
+        Self {
+            sender: config.name.clone(),
+            content: content.to_string(),
+            timestamp: Utc::now(),
+            color: config.color
         }
     }
 }

@@ -1,5 +1,5 @@
 use tui::backend::Backend;
-use tui::{Frame, Terminal};
+use tui::Frame;
 use tui::layout::{Constraint, Direction, Layout, Margin, Rect};
 use tui::style::{Modifier, Style};
 use tui::text::{Span, Spans, Text};

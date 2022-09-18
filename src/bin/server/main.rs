@@ -1,7 +1,9 @@
 use std::fs::File;
 use std::net::TcpListener;
+use std::sync::Arc;
 use std::sync::mpsc::channel;
-use std::thread::spawn;
+use std::thread::{sleep, spawn};
+use std::time::Duration;
 
 use chrono::Utc;
 
@@ -33,6 +35,7 @@ fn main() {
     info!("Running server!");
 
     let (config, new_config) = ServerConfig::load();
+    let config = Arc::new(config);
 
     info!("Config loaded, was new config created: {}", new_config);
 
@@ -59,86 +62,110 @@ fn main() {
         }
     });
 
-    let _setup_thread = spawn(move || {
-        let mut users: Vec<User> = Vec::new();
-        loop {
-            users.append(&mut to_setup_rx.try_iter().collect());
+    let _setup_thread = spawn({
+        let config = config.clone();
 
-            let mut i = 0;
-            while i < users.len() {
-                match users[i].setup_behave() {
-                    Some(Ok(_)) => {
-                        let mut user = users.remove(i);
+        move || {
+            let config = config.clone();
+            let mut users: Vec<User> = Vec::new();
+            loop {
+                users.append(&mut to_setup_rx.try_iter().collect());
 
-                        user.send_packets(&vec![
-                            ActivePacket::SystemMessage(Message {
-                                sender: config.name.clone(),
-                                content: config.motd.clone(),
-                                timestamp: Utc::now(),
-                                color: config.color
-                            })
-                        ]);
+                let mut i = 0;
+                while i < users.len() {
+                    match users[i].setup_behave() {
+                        Some(Ok(_)) => {
+                            let mut user = users.remove(i);
 
-                        to_active_tx.send(user).expect("Could not send user")
-                    }
-                    Some(Err(error)) => {
-                        info!("Client disconnected: {}", error);
-                        users.remove(i).close(format!("Disconnected: {}", error));
-                    }
-                    None => {
-                        i += 1;
-                    }
-                }
-            }
-        }
-    });
+                            user.send_packets(&vec![
+                                ActivePacket::SystemMessage(Message::new_server_message(
+                                    config.motd.clone(),
+                                    &config,
+                                ))
+                            ]);
 
-    let _active_thread = spawn(move || {
-        let mut users: Vec<User> = Vec::new();
-        loop {
-            users.append(&mut to_active_rx.try_iter().collect());
-
-            let mut outbound_queue = Vec::new();
-
-            let mut i = 0;
-            while i < users.len() {
-                match users[i].behave() {
-                    Some(Ok(msg)) => {
-                        match msg {
-                            ActivePacket::Shutdown { reason } => {
-                                info!("Client disconnected: {}", reason);
-                                users.remove(i).close("Client disconnect");
-                                continue
-                            }
-                            // All other packets get forwarded back out
-                            packet => {
-                                match &packet {
-                                    ActivePacket::Message(msg)
-                                    | ActivePacket::SystemMessage(msg) => {
-                                        info!("{}", msg)
-                                    }
-                                    ActivePacket::Shutdown { .. } => {}
-                                }
-                                outbound_queue.push(packet)
-                            }
+                            to_active_tx.send(user).expect("Could not send user")
+                        }
+                        Some(Err(error)) => {
+                            info!("Client disconnected: {}", error);
+                            users.remove(i).close(format!("Disconnected: {}", error));
+                        }
+                        None => {
+                            i += 1;
                         }
                     }
-                    Some(Err(error)) => {
-                        info!("Client disconnected: {}", error);
-                        users.remove(i).close(format!("Disconnected: {}", error));
-                        continue
-                    }
-                    _ => {}
                 }
-                i += 1;
-            }
-            outbound_queue.push(ActivePacket::Shutdown { reason: "Test reason".to_string() });
-            // Send outbound queue to all users
-            for user in users.iter_mut() {
-                user.send_packets(&outbound_queue);
+                sleep(Duration::from_millis(config.tickrate))
             }
         }
     });
 
-    loop {}
+    let mut users: Vec<User> = Vec::new();
+    let config = config.clone();
+
+    loop {
+        let mut outbound_queue = Vec::new();
+
+        let mut new_users: Vec<User> = to_active_rx.try_iter().map(|user| {
+            outbound_queue.push(
+                ActivePacket::SystemMessage(Message::new_server_message(
+                    format!("User {} has joined!", user.config().unwrap().username),
+                    config.as_ref()
+                ))
+            );
+
+            user
+        }).collect();
+
+        let mut i = 0;
+        while i < users.len() {
+            match users[i].behave() {
+                Some(Ok(msg)) => {
+                    match msg {
+                        ActivePacket::Shutdown { reason } => {
+                            info!("Client disconnected: {}", reason);
+
+                            // Client can never get to this thread if they don't send a config
+                            outbound_queue.push(ActivePacket::SystemMessage {
+                                0: Message::new_server_message(
+                                    format!("User {} has disconnected", users[i].config().unwrap().username),
+                                    &config
+                                )
+                            });
+
+                            users.remove(i).close("Client disconnect");
+                            continue
+                        }
+                        // All other packets get forwarded back out
+                        packet => {
+                            match &packet {
+                                ActivePacket::Message(msg)
+                                | ActivePacket::SystemMessage(msg) => {
+                                    info!("{}", msg)
+                                }
+                                ActivePacket::Shutdown { .. } => {}
+                            }
+                            outbound_queue.push(packet)
+                        }
+                    }
+                }
+                Some(Err(error)) => {
+                    info!("Client disconnected: {}", error);
+                    users.remove(i).close(format!("Disconnected: {}", error));
+                    continue
+                }
+                _ => {}
+            }
+            i += 1;
+        }
+        // Send outbound queue to all users
+        for user in users.iter_mut() {
+            user.send_packets(&outbound_queue);
+        }
+
+        // delay inserting the users by a cycle so they don't receive their own joining message
+        users.append(&mut new_users);
+
+        sleep(Duration::from_millis(config.tickrate))
+    }
 }
