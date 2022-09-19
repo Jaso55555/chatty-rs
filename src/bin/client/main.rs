@@ -1,7 +1,6 @@
 mod ui;
 mod net;
 
-use std::fs::File;
 use std::io;
 use chrono::Utc;
 use tui_textarea::{CursorMove, Input, Key};
@@ -12,19 +11,13 @@ use net::NetCode;
 use ui::UIStorage;
 use crate::net::NetCodeState;
 use crate::ui::crash;
-use simplelog;
+use common::logs;
 use common::net::active::ActivePacket;
 use crate::ui::choice::Choice;
 
 
 fn main() -> Result<(), io::Error> {
-    simplelog::WriteLogger::init(
-        simplelog::LevelFilter::Info,
-        simplelog::Config::default(),
-        File::create(
-            format!("logs\\client-{}.txt", Utc::now().format("%d-%m-%Y-%H-%M"))
-        ).expect("Could not create log")
-    ).expect("Could not init logger");
+    logs::client_log_init();
 
     let mut term = ui::init();
 
@@ -128,7 +121,3 @@ fn main() -> Result<(), io::Error> {
 
     Ok(())
 }
-//
-// pub fn draw<B: Backend>(f: &mut Frame<B>, message_list: &Vec<Message>, scroll: u16, state: bool) {
-//     f.render_widget(T, f.size())
-// }

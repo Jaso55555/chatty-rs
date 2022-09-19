@@ -8,6 +8,7 @@ use std::time::Duration;
 use chrono::Utc;
 
 use log::info;
+use common::logs;
 use common::message::Message;
 use common::net::active::ActivePacket;
 use common::server_config::ServerConfig;
@@ -16,21 +17,7 @@ pub mod user;
 use user::User;
 
 fn main() {
-    simplelog::CombinedLogger::init(vec![
-        simplelog::TermLogger::new(
-            simplelog::LevelFilter::Info,
-            simplelog::Config::default(),
-            simplelog::TerminalMode::Mixed,
-            simplelog::ColorChoice::Auto
-        ),
-        simplelog::WriteLogger::new(
-            simplelog::LevelFilter::Info,
-            simplelog::Config::default(),
-            File::create(
-                format!("logs\\server-{}.txt", Utc::now().format("%d-%m-%Y-%H-%M"))
-            ).expect("Could not create log")
-        )
-    ]).expect("Could not init logger");
+    logs::server_log_init();
 
     info!("Running server!");
 

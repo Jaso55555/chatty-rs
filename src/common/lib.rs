@@ -7,6 +7,7 @@ pub mod net;
 pub mod message;
 
 pub mod utils;
+pub mod logs;
 
 // Unused
 pub mod channel;
