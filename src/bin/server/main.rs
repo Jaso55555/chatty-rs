@@ -1,17 +1,17 @@
 use std::fs::File;
 use std::net::TcpListener;
-use std::sync::Arc;
 use std::sync::mpsc::channel;
+use std::sync::Arc;
 use std::thread::{sleep, spawn};
 use std::time::Duration;
 
 use chrono::Utc;
 
-use log::info;
 use common::logs;
 use common::message::Message;
 use common::net::active::ActivePacket;
 use common::server_config::ServerConfig;
+use log::info;
 
 pub mod user;
 use user::User;
@@ -37,9 +37,9 @@ fn main() {
                     let user = match User::new(socket) {
                         Err(error) => {
                             info!("{}", error);
-                            continue
+                            continue;
                         }
-                        Ok(user) => user
+                        Ok(user) => user,
                     };
 
                     to_setup_tx.send(user).expect("Could not send user")
@@ -64,12 +64,9 @@ fn main() {
                         Some(Ok(_)) => {
                             let mut user = users.remove(i);
 
-                            user.send_packets(&vec![
-                                ActivePacket::SystemMessage(Message::new_server_message(
-                                    config.motd.clone(),
-                                    &config,
-                                ))
-                            ]);
+                            user.send_packets(&vec![ActivePacket::SystemMessage(
+                                Message::new_server_message(config.motd.clone(), &config),
+                            )]);
 
                             to_active_tx.send(user).expect("Could not send user")
                         }
@@ -93,16 +90,17 @@ fn main() {
     loop {
         let mut outbound_queue = Vec::new();
 
-        let mut new_users: Vec<User> = to_active_rx.try_iter().map(|user| {
-            outbound_queue.push(
-                ActivePacket::SystemMessage(Message::new_server_message(
+        let mut new_users: Vec<User> = to_active_rx
+            .try_iter()
+            .map(|user| {
+                outbound_queue.push(ActivePacket::SystemMessage(Message::new_server_message(
                     format!("User {} has joined!", user.config().unwrap().username),
-                    config.as_ref()
-                ))
-            );
+                    config.as_ref(),
+                )));
 
-            user
-        }).collect();
+                user
+            })
+            .collect();
 
         let mut i = 0;
         while i < users.len() {
@@ -115,19 +113,21 @@ fn main() {
                             // Client can never get to this thread if they don't send a config
                             outbound_queue.push(ActivePacket::SystemMessage {
                                 0: Message::new_server_message(
-                                    format!("User {} has disconnected", users[i].config().unwrap().username),
-                                    &config
-                                )
+                                    format!(
+                                        "User {} has disconnected",
+                                        users[i].config().unwrap().username
+                                    ),
+                                    &config,
+                                ),
                             });
 
                             users.remove(i).close("Client disconnect");
-                            continue
+                            continue;
                         }
                         // All other packets get forwarded back out
                         packet => {
                             match &packet {
-                                ActivePacket::Message(msg)
-                                | ActivePacket::SystemMessage(msg) => {
+                                ActivePacket::Message(msg) | ActivePacket::SystemMessage(msg) => {
                                     info!("{}", msg)
                                 }
                                 ActivePacket::Shutdown { .. } => {}
@@ -139,7 +139,7 @@ fn main() {
                 Some(Err(error)) => {
                     info!("Client disconnected: {}", error);
                     users.remove(i).close(format!("Disconnected: {}", error));
-                    continue
+                    continue;
                 }
                 _ => {}
             }

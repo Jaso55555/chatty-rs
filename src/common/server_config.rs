@@ -1,6 +1,6 @@
-use std::path::PathBuf;
-use serde::{Deserialize, Serialize};
 use crate::config::{load_config, write_config};
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 const SERVER_CONFIG_PATH: &'static str = "server_config.json";
 
@@ -10,7 +10,7 @@ pub struct ServerConfig {
     pub motd: String,
     pub color: [u8; 3],
     pub tickrate: u64,
-    pub ip: String
+    pub ip: String,
 }
 
 impl ServerConfig {
@@ -41,7 +41,7 @@ impl Default for ServerConfig {
             motd: "Default MOTD".to_string(),
             color: [255, 247, 0],
             tickrate: 50,
-            ip: "127.0.0.1:5678".to_string()
+            ip: "127.0.0.1:5678".to_string(),
         }
     }
 }

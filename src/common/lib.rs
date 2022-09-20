@@ -1,16 +1,13 @@
 // Config
-pub mod config;
 pub mod client_config;
+pub mod config;
 pub mod server_config;
 // Network
-pub mod net;
 pub mod message;
+pub mod net;
 
-pub mod utils;
 pub mod logs;
+pub mod utils;
 
 // Unused
 pub mod channel;
-
-
-

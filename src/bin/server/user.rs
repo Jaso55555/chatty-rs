@@ -1,20 +1,20 @@
-use std::io;
-use std::io::Write;
-use std::net::{Shutdown, TcpStream};
+use crate::user::UserState::{Closed, Closing};
+use common::client_config::ClientConfig;
+use common::net::active::ActivePacket;
+use common::net::error::NetCodeErr;
+use common::net::init::{ConnectionInit, FinalHandshake};
+use common::utils::{await_object, serialize_rmp, write_obj_to_socket};
 use log::{error, info, warn};
 use rmp_serde::decode::Error;
 use serde::de::DeserializeOwned;
-use common::net::error::NetCodeErr;
-use common::net::init::{ConnectionInit, FinalHandshake};
-use common::client_config::ClientConfig;
-use common::net::active::ActivePacket;
-use common::utils::{await_object, serialize_rmp, write_obj_to_socket};
-use crate::user::UserState::{Closed, Closing};
+use std::io;
+use std::io::Write;
+use std::net::{Shutdown, TcpStream};
 
 pub struct User {
     socket: TcpStream,
     state: UserState,
-    config: Option<ClientConfig>
+    config: Option<ClientConfig>,
 }
 
 impl User {
@@ -27,16 +27,14 @@ impl User {
         match socket.set_nonblocking(true) {
             // if cannot set non-blocking,
             Err(_error) => {
-                match socket.write_all(
-                    &serialize_rmp(ConnectionInit::Failed).unwrap()[..]
-                ) {
+                match socket.write_all(&serialize_rmp(ConnectionInit::Failed).unwrap()[..]) {
                     Err(_error) => return Err(NetCodeErr::MessageSendFailed),
                     _ => {}
                 }
 
                 socket.shutdown(Shutdown::Both)?;
 
-                return Err(NetCodeErr::CouldNotSetNonBlocking)
+                return Err(NetCodeErr::CouldNotSetNonBlocking);
             }
             _ => {}
         }
@@ -47,38 +45,36 @@ impl User {
             socket,
             // Add auth later
             state: UserState::WaitingForConfig,
-            config: None
+            config: None,
         })
     }
 
     pub fn setup_behave(&mut self) -> Option<Result<(), NetCodeErr>> {
         match self.state {
-            UserState::WaitingForConfig => {
-                match self.await_object::<ClientConfig>() {
-                    Ok(config) => {
-                        info!("Username {} connected", config.username);
-                        self.config = Some(config);
+            UserState::WaitingForConfig => match self.await_object::<ClientConfig>() {
+                Ok(config) => {
+                    info!("Username {} connected", config.username);
+                    self.config = Some(config);
 
-                        match write_obj_to_socket(&mut self.socket, FinalHandshake::Complete) {
-                            Ok(_) => {}
-                            Err(error) => {
-                                error!("Could not send back final handshake: {error:?}");
-                                return Some(Err(NetCodeErr::from(error)))
-                            }
+                    match write_obj_to_socket(&mut self.socket, FinalHandshake::Complete) {
+                        Ok(_) => {}
+                        Err(error) => {
+                            error!("Could not send back final handshake: {error:?}");
+                            return Some(Err(NetCodeErr::from(error)));
                         }
-
-                        self.state = UserState::Active;
-
-                        info!("Got config!");
-
-                        Some(Ok(()))
                     }
-                    Err(err) => {
-                        warn!("Waiting for config warning! {err}");
-                        None
-                    }
+
+                    self.state = UserState::Active;
+
+                    info!("Got config!");
+
+                    Some(Ok(()))
                 }
-            }
+                Err(err) => {
+                    warn!("Waiting for config warning! {err}");
+                    None
+                }
+            },
             UserState::Active | Closing { .. } | Closed => {
                 unreachable!()
             }
@@ -97,10 +93,8 @@ impl User {
 
         for item in packets.iter() {
             match write_obj_to_socket(&mut self.socket, item) {
-                Ok(_) => {},
-                Err(error) => {
-                    errors.push((error, (*item).clone()))
-                }
+                Ok(_) => {}
+                Err(error) => errors.push((error, (*item).clone())),
             }
         }
 
@@ -112,7 +106,9 @@ impl User {
     }
 
     pub fn close<T: ToString>(mut self, reason: T) {
-        self.state = Closing { reason: reason.to_string() }
+        self.state = Closing {
+            reason: reason.to_string(),
+        }
     }
 
     pub fn config(&self) -> Option<&ClientConfig> {
@@ -132,16 +128,13 @@ impl Drop for User {
         match &self.state {
             UserState::WaitingForConfig | Closed => {}
             UserState::Active => {
-                self.send_packets(&vec![
-                    ActivePacket::Shutdown {
-                        reason: "Server closed connection unexpectedly".to_string()
-                    }
-                ]);
+                self.send_packets(&vec![ActivePacket::Shutdown {
+                    reason: "Server closed connection unexpectedly".to_string(),
+                }]);
             }
             Closing { reason } => {
-                self.send_packets(&vec![
-                ActivePacket::Shutdown {
-                    reason: reason.clone()
+                self.send_packets(&vec![ActivePacket::Shutdown {
+                    reason: reason.clone(),
                 }]);
                 if let Err(e) = self.socket.shutdown(Shutdown::Both) {
                     error!("Could not shutdown socket: {}", e)
@@ -156,5 +149,5 @@ enum UserState {
     WaitingForConfig,
     Active,
     Closing { reason: String },
-    Closed
+    Closed,
 }
