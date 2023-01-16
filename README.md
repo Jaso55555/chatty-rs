@@ -7,6 +7,9 @@
 
 `cargo run --bin <client/server>`
 
+or if `just` is installed (`cargo install just`)
+`just <client/server>`
+
 ## Docker
 
 ### Build
